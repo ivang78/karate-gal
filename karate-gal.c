@@ -44,9 +44,8 @@ char nstr[10];
 	draw background
 */
 void draw_bg () {
-	gal_gotoxy(0,13);
 	for (char i = 0; i < 32; i++) {
-		gal_putc(143);
+		z80_bpoke(SCREEN_ADDR + (13 << 5) + i, 143);
 	}
 	for (char i = 0; i < 96; i++) {
 		z80_bpoke(SCREEN_ADDR + i, bg[i]);
