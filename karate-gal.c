@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <conio.h>
+#include <time.h>
 #include "galaksija.h"
 
 #define arm_free 			0
@@ -10,13 +11,14 @@
 #define leg_kick_forward 	1
 #define leg_kick_up			2
 #define leg_step			3
-#define attack_punch_forward 	1
-#define attack_punch_up 		2
-#define attack_kick_forward 	3
-#define attack_kick_up		 	4
+#define action_free						0
+#define action_attack_punch_forward 	1
+#define action_attack_punch_up 			2
+#define action_attack_kick_forward 		3
+#define action_attack_kick_up		 	4
+#define action_step					 	5
 
-
-char x_pos, y_pos, x_enemy, c, attack;
+char x_pos, y_pos, x_enemy, c;
 char sprite[384] = {
   0xc0, 0xc0, 0xc0, 0xef, 0xf7, 0xc1, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xef, 0xf7, 0xc1, 0xc0, 0xc0, 0xc0, 0xc0, 0xca, 0xff, 0xd3, 0xe8, 0xd4, 0xc0, 0xc0, 0xc0, 0xc0, 0xef, 0xf7, 0xc1, 0xc0, 0xf0,
   0xc0, 0xe0, 0xfc, 0xfe, 0xfd, 0xe4, 0xd0, 0xc0, 0xc0, 0xc0, 0xf8, 0xfe, 0xfd, 0xe4, 0xf0, 0xd0, 0xc0, 0xf8, 0xfc, 0xff, 0xdc, 0xdf, 0xc1, 0xc0, 0xc0, 0xc0, 0xf8, 0xfe, 0xfd, 0xe4, 0xfe, 0xc7,
@@ -36,8 +38,17 @@ char bg[96] = {
   0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xe0, 0xcc, 0xc1, 0xc0, 0xc0, 0xcb, 0xc6, 0xcc, 0xd0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0,
   0xcc, 0xc3, 0xcc, 0xcc, 0xcc, 0xc6, 0xc9, 0xcc, 0xcc, 0xcc, 0xc3, 0xcc, 0xcc, 0xcc, 0xc3, 0xcc, 0xcc, 0xcc, 0xc6, 0xc9, 0xcc, 0xcc, 0xcc, 0xc3, 0xcc, 0xcc, 0xcc, 0xc6, 0xc9, 0xcc, 0xcc, 0xcc
 };
+char arms[6] = {
+	arm_free, arm_punch_forward, arm_punch_up, arm_free, arm_free_up, arm_free
+};
+char legs[6] = {
+	leg_free, leg_free, leg_free, leg_kick_forward, leg_kick_up, leg_step
+};
+char attacks[2];
+int attack_times[2];
 char hits[2];
-int rnd;
+char enemy_move = 0;
+unsigned int rnd, tm, tm2;
 char nstr[10];
 
 /*
@@ -74,15 +85,14 @@ void draw_hits () {
 	draw sprite
 	character: 0 - you, 1 - enemy
 	xp: x position
-	arm: 0 - free, 1 - punch forward, 2 - free up, 3 - punch up	
-	leg: 0 - free, 1 - kick forward, 2 - kick up, 3 - step
+	action: action (see constants)
 */
-void draw_sprite (char character, char xp, char arm, char leg) {
-	char p0 = arm<<3;
-	char p1 = leg<<3;	
+void draw_sprite (char character, char xp, char action) {
+	char p0 = arms[action]<<3;
+	char p1 = legs[action]<<3;	
 	int addr0 = SCREEN_ADDR + (y_pos << 5) + xp;
 	for (char j = 0; j < 6; j++) {
-		if (arm != leg && j == 3) {
+		if (arms[action] != legs[action] && j == 3) {
 			p0 = p1;
 		}
 		for (char i = 0; i < 8; i++) {
@@ -91,60 +101,111 @@ void draw_sprite (char character, char xp, char arm, char leg) {
 	}
 }
 
-int main() {
+/*
+	Emeny action
+*/
+void enemy_action () {
+	char redraw = 0;
+	tm2 = clock();
+	// movement
+	if (tm2 - tm > 250 && enemy_move == 0) {
+		enemy_move = 1;
+	}
+	if (tm2 - tm > 30 && enemy_move == 1) {		
+		if (x_enemy - x_pos > 6) {
+			x_enemy--;
+			redraw = 1;
+		} else {
+			enemy_move = 0;
+			redraw = 0;
+		}
+	}
+	// attacks
+	
+	// 
+	if (redraw == 1) {
+		tm = tm2;
+		draw_sprite(1, x_enemy, action_step);
+		draw_sprite(1, x_enemy, action_free);
+	}
+}
+
+int main() {	
 	rnd = z80_wpeek(RND_ADDR);
 	srand(rnd);
+		
 	gal_cls();
 	draw_bg ();
-	attack = 0;
+	tm = clock();
 	x_pos = 0;
 	x_enemy = 23;
  	y_pos = 7;
+	attacks[0] = 0;
+	attacks[1] = 0;
 	hits[0] = 11;
 	hits[1] = 11;
-	draw_sprite(0, x_pos, 0, 0);
-	draw_sprite(1, x_enemy, 0, 0);
-	draw_hits();
-	do {
+	draw_sprite(0, x_pos, action_free);
+	draw_sprite(1, x_enemy, action_free);
+	draw_hits();	
+	do {		
 		c = getk();
 		switch (c) {
 			case 45: // left 
-				attack = 0;
-				x_pos--;
-				draw_sprite(0, x_pos, arm_free, leg_step);
-				draw_sprite(0, x_pos, arm_free, leg_free);
+				attacks[0] = 0;
+				if (x_pos > 0) {
+					x_pos--;
+				}
+				draw_sprite(0, x_pos, action_step);
+				draw_sprite(0, x_pos, action_free);
 				break;
 			case 46: // right
-				attack = 0;
-				x_pos++;
-				draw_sprite(0, x_pos, arm_free, leg_step);
-				draw_sprite(0, x_pos, arm_free, leg_free);
+				attacks[0] = 0;
+				if (x_enemy - x_pos > 6) {
+					x_pos++;
+				}
+				draw_sprite(0, x_pos, action_step);
+				draw_sprite(0, x_pos, action_free);
 				break;
 			case 43: // up, kick up
-				attack = attack_kick_up;
-				draw_sprite(0, x_pos, arm_free_up, leg_kick_up);
+				if (attacks[0] == 0) {
+					attack_times[0] = clock();
+				}
+				attacks[0] = action_attack_kick_up;
 				break;
 			case 44: // down, kick forward
-				attack = attack_kick_forward;
-				draw_sprite(0, x_pos, arm_free, leg_kick_forward);
+				if (attacks[0] == 0) {
+					attack_times[0] = clock();
+				}
+				attacks[0] = action_attack_kick_forward;
 				break;
 			case 'Q': // punch up
-				attack = attack_punch_up;
-				draw_sprite(0, x_pos, arm_punch_up, leg_free);
+				if (attacks[0] == 0) {
+					attack_times[0] = clock();
+				}
+				attacks[0] = action_attack_punch_up;
 				break;				
 			case 'A': // punch forward
-				attack = attack_punch_forward;
-				draw_sprite(0, x_pos, arm_punch_forward, leg_free);
-				break;				
+				if (attacks[0] == 0) {
+					attack_times[0] = clock();
+				}				
+				attacks[0] = action_attack_punch_forward;
+				break;
+/*			case 'T':
+				tm = clock(); itoa(tm, nstr, 10); gal_gotoxy (10, 5); gal_puts(nstr);
+				break;*/
 			case 0:
-				if (attack > 0) {
-					attack = 0;
-					draw_sprite(0, x_pos, arm_free, leg_free);
+				if (attacks[0] > 0) {
+					attacks[0] = action_free;
+					draw_sprite(0, x_pos, action_free);
 				}
 				break;
 			default:
 				break;
 		}
+		if (attacks[0] > 0) {
+			draw_sprite(0, x_pos, attacks[0]);
+		}
+		enemy_action();
 	} while (c != 67);
 
 	return 0;
