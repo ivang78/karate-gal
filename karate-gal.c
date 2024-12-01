@@ -44,12 +44,13 @@ char arms[6] = {
 char legs[6] = {
 	leg_free, leg_free, leg_free, leg_kick_forward, leg_kick_up, leg_step
 };
-char attacks[2];
-int attack_times[2];
+char attack;
+int attack_time;
 char hits[2];
 char enemy_move = 0;
 unsigned int rnd, tm, tm2;
 char nstr[10];
+char cont = 1;
 
 /*
 	draw background
@@ -66,7 +67,7 @@ void draw_bg () {
 /*
 	draw hits
 */
-void draw_hits () {
+void draw_hits (char show_hit) {
 	gal_gotoxy(6,14); gal_puts("YOU");
 	gal_gotoxy(22,14); gal_puts("ENEMY");
 	for (char i = 0; i < 11; i++) {
@@ -78,6 +79,20 @@ void draw_hits () {
 		if (i < hits[1]) {
 			z80_bpoke(SCREEN_ADDR + (15 << 5) + i + 19, 255);
 		}
+	}
+	if (show_hit == 1) {
+		gal_gotoxy(14, 5); gal_puts("HIT!");
+	}
+	if (hits[0] == 0 || hits[1] == 0) {
+		if (hits[1] == 0) {
+			gal_gotoxy(14, 5); gal_puts("WIN!");
+		} else {
+			gal_gotoxy(13, 5); gal_puts("LOOSE");
+		}
+		do {
+			
+		} while (getk() == 0);
+		c = 255;
 	}
 }
 
@@ -106,7 +121,12 @@ void draw_sprite (char character, char xp, char action) {
 */
 void enemy_action () {
 	char redraw = 0;
+	char attack_enemy = 0;
+	char attack_state = 0;
 	tm2 = clock();
+	if (tm2 < tm) { // overload time counter
+		tm = 0; 
+	}
 	// movement
 	if (tm2 - tm > 250 && enemy_move == 0) {
 		enemy_move = 1;
@@ -121,92 +141,136 @@ void enemy_action () {
 		}
 	}
 	// attacks
-	
-	// 
+	if (x_enemy - x_pos <= 6) {
+ 		if (redraw == 0 && tm2 - tm > (rand() / (RAND_MAX / 20))) { // enemy try to attack
+			attack_enemy = (rand() / (RAND_MAX / 4)) + 1;
+			redraw = 1;
+			if (attack > 0) { // you attacked
+				if (attack_time < tm2) { // you attack first
+					if (attack == attack_enemy) { //same attack
+						attack_state = 0; // block attack, nothing happens
+					} else { // different attack
+						if ((rand() / (RAND_MAX / 100)) < 50) {
+							attack_state = 1; // you hits
+						} else {
+							attack_state = 2; // enemy hits
+						}
+					}
+				} else { // enemy attack first 
+					if ((rand() / (RAND_MAX / 100)) < 50) {
+						attack_state = 2; // enemy hits
+					}
+				}
+			} else { // you are not attacked
+				if ((rand() / (RAND_MAX / 100)) < 80) {
+					attack_state = 2; // enemy hits
+				}
+			}
+		} else if (attack > 0) { // no emeny attack, you attacked
+			if ((rand() / (RAND_MAX / 100)) < 80) {
+				attack_state = 1; // you hits
+			}
+		}
+	}
+	// redraw sprite
 	if (redraw == 1) {
 		tm = tm2;
-		draw_sprite(1, x_enemy, action_step);
+		if (attack_enemy > 0) {
+			draw_sprite(1, x_enemy, attack_enemy);
+		} else {
+			draw_sprite(1, x_enemy, action_step);
+		}
 		draw_sprite(1, x_enemy, action_free);
+		gal_gotoxy(14, 5); gal_puts("    ");
+	}
+	// redraw hit
+	if (attack_state > 0) {
+		if (attack_state == 1) {
+			hits[1]--;
+		} else if (attack_state == 2) {
+			hits[0]--;			
+		} 
+		draw_hits(1);
 	}
 }
 
 int main() {	
 	rnd = z80_wpeek(RND_ADDR);
 	srand(rnd);
-		
-	gal_cls();
-	draw_bg ();
-	tm = clock();
-	x_pos = 0;
-	x_enemy = 23;
- 	y_pos = 7;
-	attacks[0] = 0;
-	attacks[1] = 0;
-	hits[0] = 11;
-	hits[1] = 11;
-	draw_sprite(0, x_pos, action_free);
-	draw_sprite(1, x_enemy, action_free);
-	draw_hits();	
-	do {		
-		c = getk();
-		switch (c) {
-			case 45: // left 
-				attacks[0] = 0;
-				if (x_pos > 0) {
-					x_pos--;
-				}
-				draw_sprite(0, x_pos, action_step);
-				draw_sprite(0, x_pos, action_free);
-				break;
-			case 46: // right
-				attacks[0] = 0;
-				if (x_enemy - x_pos > 6) {
-					x_pos++;
-				}
-				draw_sprite(0, x_pos, action_step);
-				draw_sprite(0, x_pos, action_free);
-				break;
-			case 43: // up, kick up
-				if (attacks[0] == 0) {
-					attack_times[0] = clock();
-				}
-				attacks[0] = action_attack_kick_up;
-				break;
-			case 44: // down, kick forward
-				if (attacks[0] == 0) {
-					attack_times[0] = clock();
-				}
-				attacks[0] = action_attack_kick_forward;
-				break;
-			case 'Q': // punch up
-				if (attacks[0] == 0) {
-					attack_times[0] = clock();
-				}
-				attacks[0] = action_attack_punch_up;
-				break;				
-			case 'A': // punch forward
-				if (attacks[0] == 0) {
-					attack_times[0] = clock();
-				}				
-				attacks[0] = action_attack_punch_forward;
-				break;
-/*			case 'T':
-				tm = clock(); itoa(tm, nstr, 10); gal_gotoxy (10, 5); gal_puts(nstr);
-				break;*/
-			case 0:
-				if (attacks[0] > 0) {
-					attacks[0] = action_free;
+	do {
+		gal_cls();
+		draw_bg ();
+		tm = clock();
+		x_pos = 0;
+		x_enemy = 23;
+		y_pos = 7;
+		attack = 0;
+		hits[0] = 11;
+		hits[1] = 11;
+		draw_sprite(0, x_pos, action_free);
+		draw_sprite(1, x_enemy, action_free);
+		draw_hits(0);	
+		do {		
+			c = getk();
+			switch (c) {
+				case 45: // left 
+					attack = 0;
+					if (x_pos > 0) {
+						x_pos--;
+					}
+					draw_sprite(0, x_pos, action_step);
 					draw_sprite(0, x_pos, action_free);
-				}
-				break;
-			default:
-				break;
-		}
-		if (attacks[0] > 0) {
-			draw_sprite(0, x_pos, attacks[0]);
-		}
-		enemy_action();
-	} while (c != 67);
-
+					break;
+				case 46: // right
+					attack = 0;
+					if (x_enemy - x_pos > 6) {
+						x_pos++;
+					}
+					draw_sprite(0, x_pos, action_step);
+					draw_sprite(0, x_pos, action_free);
+					break;
+				case 43: // up, kick up
+					if (attack == 0) {
+						attack_time = clock();
+					}
+					attack = action_attack_kick_up;
+					break;
+				case 44: // down, kick forward
+					if (attack == 0) {
+						attack_time = clock();
+					}
+					attack = action_attack_kick_forward;
+					break;
+				case 'Q': // punch up
+					if (attack == 0) {
+						attack_time = clock();
+					}
+					attack = action_attack_punch_up;
+					break;				
+				case 'A': // punch forward
+					if (attack == 0) {
+						attack_time = clock();
+					}				
+					attack = action_attack_punch_forward;
+					break;
+				case 0:
+					if (attack > 0) {
+						attack = action_free;
+						draw_sprite(0, x_pos, action_free);
+					}
+					break;
+				case 67: // del
+					cont = 0;
+					c = 255;
+					break;
+				default:
+					break;
+			}
+			if (attack > 0) {
+				draw_sprite(0, x_pos, attack);
+			}
+			enemy_action();
+		} while (c != 255);
+	} while (cont == 1);
 	return 0;
 }
