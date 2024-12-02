@@ -45,9 +45,12 @@ char legs[6] = {
 	leg_free, leg_free, leg_free, leg_kick_forward, leg_kick_up, leg_step
 };
 char attack;
-int attack_time;
+int attack_time, check_attack_time;
 char hits[2];
 char enemy_move = 0;
+char eneny_accuracy = 80;
+char attack_delay = 20;
+char possible_attack = 0;
 unsigned int rnd, tm, tm2;
 char cont = 1;
 
@@ -161,7 +164,7 @@ void enemy_action () {
 	}
 	// attacks
 	if (x_enemy - x_pos <= 6) {
- 		if (redraw == 0 && tm2 - tm > (rand() / (RAND_MAX / 20))) { // enemy try to attack
+ 		if (redraw == 0 && tm2 - tm > (rand() / (RAND_MAX / attack_delay)) + attack_delay) { // enemy try to attack
 			attack_enemy = (rand() / (RAND_MAX / 4)) + 1;
 			redraw = 1;
 			if (attack > 0) { // you attacked
@@ -176,17 +179,17 @@ void enemy_action () {
 						}
 					}
 				} else { // enemy attack first 
-					if ((rand() / (RAND_MAX / 100)) < 50) {
+					if ((rand() / (RAND_MAX / 100)) < (eneny_accuracy - 30)) {
 						attack_state = 2; // enemy hits
 					}
 				}
 			} else { // you are not attacked
-				if ((rand() / (RAND_MAX / 100)) < 80) {
+				if ((rand() / (RAND_MAX / 100)) < eneny_accuracy) {
 					attack_state = 2; // enemy hits
 				}
 			}
 		} else if (attack > 0) { // no emeny attack, you attacked
-			if ((rand() / (RAND_MAX / 100)) < 80) {
+			if ((rand() / (RAND_MAX / 100)) < eneny_accuracy) {
 				attack_state = 1; // you hits
 			}
 		}
@@ -199,6 +202,7 @@ void enemy_action () {
 		} else {
 			draw_sprite(1, x_enemy, action_step);
 		}
+		for (int i = 0; i <= 700;i++) {}
 		draw_sprite(1, x_enemy, action_free);
 		gal_gotoxy(14, 5); gal_puts("    ");
 	}
@@ -236,6 +240,14 @@ int main() {
 		draw_hits(0);	
 		do {		
 			c = getk();
+			if (c == 43 || c == 44 || c == 'Q' || c == 'A') { // common attacks actions
+				check_attack_time = clock();
+				possible_attack = 0;
+				if (attack == 0 && (check_attack_time - attack_time > attack_delay || check_attack_time < attack_time)) {
+					possible_attack = 1;
+					attack_time = check_attack_time;
+				}
+			}
 			switch (c) {
 				case 45: // left 
 					attack = 0;
@@ -254,28 +266,24 @@ int main() {
 					draw_sprite(0, x_pos, action_free);
 					break;
 				case 43: // up, kick up
-					if (attack == 0) {
-						attack_time = clock();
+					if (possible_attack == 1) {
+						attack = action_attack_kick_up;
 					}
-					attack = action_attack_kick_up;
 					break;
 				case 44: // down, kick forward
-					if (attack == 0) {
-						attack_time = clock();
+					if (possible_attack == 1) {
+						attack = action_attack_kick_forward;
 					}
-					attack = action_attack_kick_forward;
 					break;
 				case 'Q': // punch up
-					if (attack == 0) {
-						attack_time = clock();
+					if (possible_attack == 1) {
+						attack = action_attack_punch_up;
 					}
-					attack = action_attack_punch_up;
 					break;				
 				case 'A': // punch forward
-					if (attack == 0) {
-						attack_time = clock();
-					}				
-					attack = action_attack_punch_forward;
+					if (possible_attack == 1) {
+						attack = action_attack_punch_forward;
+					}
 					break;
 				case 0:
 					if (attack > 0) {
@@ -295,6 +303,10 @@ int main() {
 			}
 			enemy_action();
 		} while (c != 255);
+		if (hits[1] == 0 && eneny_accuracy < 100) { // if you win add enemy accuracy
+			eneny_accuracy = eneny_accuracy + 5;
+			attack_delay = attack_delay - 3;
+		}
 	} while (cont == 1);
 	return 0;
 }
