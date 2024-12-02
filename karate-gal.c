@@ -49,7 +49,8 @@ int attack_time, check_attack_time;
 char hits[2];
 char enemy_move = 0;
 char eneny_accuracy = 80;
-char attack_delay = 20;
+char attack_delay = 15;
+char eneny_attack_delay = 20;
 char possible_attack = 0;
 unsigned int rnd, tm, tm2;
 char cont = 1;
@@ -164,7 +165,7 @@ void enemy_action () {
 	}
 	// attacks
 	if (x_enemy - x_pos <= 6) {
- 		if (redraw == 0 && tm2 - tm > (rand() / (RAND_MAX / attack_delay)) + attack_delay) { // enemy try to attack
+ 		if (redraw == 0 && tm2 - tm > (rand() / (RAND_MAX / eneny_attack_delay)) + eneny_attack_delay) { // enemy try to attack
 			attack_enemy = (rand() / (RAND_MAX / 4)) + 1;
 			redraw = 1;
 			if (attack > 0) { // you attacked
@@ -208,9 +209,12 @@ void enemy_action () {
 	}
 	// redraw hit
 	if (attack_state > 0) {
-		if (attack_state == 1) {
+		if (attack_state == 1) { // our hit
 			hits[1]--;
-		} else if (attack_state == 2) {
+			// reset attack and time
+			attack = 0;
+			attack_time = clock();
+		} else if (attack_state == 2) { // emeny hit
 			hits[0]--;			
 		} 
 		draw_hits(1);
@@ -286,10 +290,8 @@ int main() {
 					}
 					break;
 				case 0:
-					if (attack > 0) {
-						attack = action_free;
-						draw_sprite(0, x_pos, action_free);
-					}
+					attack = action_free;
+					draw_sprite(0, x_pos, action_free);
 					break;
 				case 67: // del
 					cont = 0;
@@ -305,7 +307,7 @@ int main() {
 		} while (c != 255);
 		if (hits[1] == 0 && eneny_accuracy < 100) { // if you win add enemy accuracy
 			eneny_accuracy = eneny_accuracy + 5;
-			attack_delay = attack_delay - 3;
+			eneny_attack_delay = eneny_attack_delay - 3;
 		}
 	} while (cont == 1);
 	return 0;
